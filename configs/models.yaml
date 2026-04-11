@@ -1,0 +1,19 @@
+camera:
+  source: 0 # 0 for default webcam, or provide an IP stream URL
+
+pipeline:
+  interval_ms: 100 # Sleep time between frames to reduce CPU load
+
+models:
+  fall_detection:
+    enabled: true
+    history_frames: 10 # Number of frames to keep in history to calculate fall
+    velocity_threshold: 0.15 # Minimum y-axis velocity to be considered a fall
+  activity:
+    enabled: true
+    mock: true # Indicates if this is purely a mock implementation
+
+api:
+  backend_url: "http://localhost:8000"
+  endpoints:
+    events: "/api/events"
