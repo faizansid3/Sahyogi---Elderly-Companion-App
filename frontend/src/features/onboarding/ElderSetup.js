@@ -3,12 +3,15 @@ import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, SafeAr
 
 export default function ElderSetup({ onComplete }) {
     const [formData, setFormData] = useState({
-        elderName: '',
-        elderAge: ''
+        name: '',
+        age: ''
     });
 
     const handleSave = () => {
-        onComplete(formData);
+        onComplete({
+            ...formData,
+            age: parseInt(formData.age, 10) || 0
+        });
     };
 
     return (
@@ -26,8 +29,8 @@ export default function ElderSetup({ onComplete }) {
                     <Text style={styles.label}>Elder's Name</Text>
                     <TextInput 
                         style={styles.input} 
-                        value={formData.elderName}
-                        onChangeText={(text) => setFormData({...formData, elderName: text})}
+                        value={formData.name}
+                        onChangeText={(text) => setFormData({...formData, name: text})}
                         placeholder="Jane Doe" 
                     />
                 </View>
@@ -36,9 +39,9 @@ export default function ElderSetup({ onComplete }) {
                     <Text style={styles.label}>Age</Text>
                     <TextInput 
                         style={styles.input} 
-                        value={formData.elderAge}
+                        value={formData.age}
                         keyboardType="numeric"
-                        onChangeText={(text) => setFormData({...formData, elderAge: text})}
+                        onChangeText={(text) => setFormData({...formData, age: text})}
                         placeholder="78" 
                     />
                 </View>

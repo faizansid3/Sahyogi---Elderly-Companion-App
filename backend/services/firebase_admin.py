@@ -1,18 +1,24 @@
 import os
+import glob
 import firebase_admin
-from firebase_admin import credentials, messaging
+from firebase_admin import credentials, messaging, firestore
 
 # Initialize Firebase Admin if credentials exist
-cred_path = os.path.join(os.path.dirname(__file__), '..', 'firebase-adminsdk.json')
-firebase_enabled = False
+base_path = os.path.join(os.path.dirname(__file__), '..')
+json_files = glob.glob(os.path.join(base_path, '*firebase-adminsdk*.json'))
 
-if os.path.exists(cred_path):
-    print("Found firebase-adminsdk.json. Firebase Push Notifications ENABLED.")
+firebase_enabled = False
+db = None
+
+if json_files:
+    cred_path = json_files[0]
+    print(f"Found {os.path.basename(cred_path)}. Firebase Push Notifications and Firestore ENABLED.")
     cred = credentials.Certificate(cred_path)
     firebase_admin.initialize_app(cred)
+    db = firestore.client()
     firebase_enabled = True
 else:
-    print("WARNING: firebase-adminsdk.json not found. Push Notifications will be MOCKED.")
+    print("WARNING: firebase-adminsdk.json not found. Database features will fail.")
 
 def send_push_notification(title: str, body: str, topic: str = "caregivers"):
     """
@@ -33,7 +39,6 @@ def send_push_notification(title: str, body: str, topic: str = "caregivers"):
         except Exception as e:
             print("Failed to send Firebase Push Notification:", e)
     else:
-        # Mock behavior
         print(f"--- MOCK FCM NOTIFICATION ---")
         print(f"To Topic: {topic}")
         print(f"Title: {title}")

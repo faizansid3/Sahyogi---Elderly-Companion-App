@@ -1,14 +1,37 @@
 import * as Speech from 'expo-speech';
 
-// In a real app run on a physical device, you would use a Voice Recognition library like @react-native-voice/voice
-// to actively listen in the background for the wake word "Sahyogi".
-// Since we are creating a stub for the demo, we mock the Text Input.
+// Replace with a valid API key, loaded from .env
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+
+export const generateGeminiResponse = async (prompt) => {
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === "your_gemini_api_key_here") {
+        console.warn("Gemini API Key missing, falling back to mock response");
+        return "I am currently disconnected from my brain. Please configure the API key in the environment variables.";
+    }
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: `You are Sahyogi, a friendly, supportive, and simple-language AI companion for an elderly person. Keep responses short and conversational. User prompt: ${prompt}` }]
+                }]
+            })
+        });
+        
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+    } catch (e) {
+        console.error("Gemini API Error:", e);
+        return "I am having trouble thinking right now. Please try again later.";
+    }
+};
 
 export const processVoiceCommand = async (textInput) => {
     const text = textInput.toLowerCase();
     
     // Check if the wake word is included 
-    // Usually, the wake word initiates the listening sequence, here we assume the text contains the full sentence
     if (!text.includes("sahyogi")) {
       return "Wake word Sahyogi not detected.";
     }
@@ -23,18 +46,14 @@ export const processVoiceCommand = async (textInput) => {
     // Local Regex / Hybrid Rule Matching First
     if (command.includes("help") || command.includes("emergency")) {
         responseText = "I am calling the emergency contacts right now. Please stay calm.";
-        // Would also invoke triggerEmergency() here
-    } else if (command.includes("medicine")) {
-        responseText = "It is time to take your blood pressure pill.";
     } else {
-        // Fallback to LLM (e.g., Gemini)
-        console.log("No local command matched. Forwarding to Gemini LLM...");
-        responseText = "I am not sure about that, but let me check my knowledge base.";
-        // TODO: Call Gemini API
+        responseText = await generateGeminiResponse(command);
     }
 
-    // Speak it back to the Elder
-    Speech.speak(responseText, { language: 'en-IN' }); // Indian English accent for Sahyogi theme
-    
+    Speech.speak(responseText, { language: 'en-IN' }); 
     return responseText;
+};
+
+export const speak = (text) => {
+    Speech.speak(text, { language: 'en-IN' });
 };
