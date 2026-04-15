@@ -6,12 +6,28 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Sahyogi needs microphone access to hear your voice and respond to you.",
+        "NSSpeechRecognitionUsageDescription": "Sahyogi uses speech recognition to understand your requests."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
-      }
-    }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Sahyogi needs microphone access to hear your voice and respond to you."
+        }
+      ]
+    ]
   }
 }

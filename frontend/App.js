@@ -6,7 +6,7 @@ import CaregiverAuth from './src/features/onboarding/CaregiverAuth';
 import ElderSetup from './src/features/onboarding/ElderSetup';
 import Dashboard from './src/features/caregiver/Dashboard';
 import ElderInteraction from './src/features/elder/ElderInteraction';
-import { setupElderProfile } from './src/services/api';
+import { apiService } from './src/services/apiService';
 
 const APP_STATE = {
     SPLASH: 0,
@@ -47,7 +47,7 @@ export default function App() {
     const handleElderSetupComplete = async (elderData) => {
         try {
             const dataToSave = { ...elderData, primary_manager_id: user.uid };
-            const res = await setupElderProfile(dataToSave);
+            const res = await apiService.elder.setup(dataToSave);
             setElder(res.elder);
             setAppState(APP_STATE.CAREGIVER_DASHBOARD);
         } catch (e) {
@@ -57,6 +57,12 @@ export default function App() {
 
     const navigateToElderDemo = () => setAppState(APP_STATE.ELDER_DEMO);
     const navigateToDashboard = () => setAppState(APP_STATE.CAREGIVER_DASHBOARD);
+    
+    const handleLogout = () => {
+        setUser(null);
+        setElder(null);
+        setAppState(APP_STATE.ROLE_SELECTION);
+    };
 
     const renderScreen = () => {
         switch (appState) {
@@ -69,7 +75,7 @@ export default function App() {
             case APP_STATE.ELDER_SETUP:
                 return <ElderSetup onComplete={handleElderSetupComplete} />;
             case APP_STATE.CAREGIVER_DASHBOARD:
-                return <Dashboard managerId={user?.uid} onGoToElder={navigateToElderDemo} />;
+                return <Dashboard managerId={user?.uid} onGoToElder={navigateToElderDemo} onLogout={handleLogout} />;
             case APP_STATE.ELDER_DEMO:
                 return <ElderInteraction myElderId={user?.managed_elder_id || "demo_elder_1"} onGoBack={navigateToDashboard} />;
             default:

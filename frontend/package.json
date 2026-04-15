@@ -14,6 +14,8 @@
     "@react-navigation/native-stack": "^6.9.17",
     "axios": "^1.6.8",
     "expo": "^51.0.0",
+    "expo-av": "~14.0.5",
+    "expo-file-system": "~16.0.8",
     "expo-speech": "~12.0.2",
     "expo-status-bar": "~1.12.1",
     "firebase": "^10.8.1",

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
-import { loginCaregiver, registerCaregiver } from '../../services/api';
+import { apiService } from '../../services/apiService';
 
 export default function CaregiverAuth({ onAuthSuccess, onGoBack }) {
     const [isLogin, setIsLogin] = useState(true);
@@ -24,7 +24,7 @@ export default function CaregiverAuth({ onAuthSuccess, onGoBack }) {
         setIsLoading(true);
         try {
             if (isLogin) {
-                const res = await loginCaregiver({ email: formData.email, password: formData.password });
+                const res = await apiService.auth.login({ email: formData.email, password: formData.password });
                 onAuthSuccess(res.user);
             } else {
                 if (!formData.name || !formData.phone) {
@@ -32,7 +32,7 @@ export default function CaregiverAuth({ onAuthSuccess, onGoBack }) {
                     setIsLoading(false);
                     return;
                 }
-                const res = await registerCaregiver(formData);
+                const res = await apiService.auth.register(formData);
                 onAuthSuccess(res.user);
             }
         } catch (error) {

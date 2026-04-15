@@ -1,40 +1,89 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, SafeAreaView, Dimensions, Alert } from 'react-native';
-import { getCaregiverDashboard } from '../../services/api';
+import { apiService } from '../../services/apiService';
 import MedicineManager from './MedicineManager';
 
 const { width } = Dimensions.get('window');
 
-export default function Dashboard({ managerId, onGoToElder }) {
+export default function Dashboard({ managerId, onGoToElder, onLogout }) {
     const [metrics, setMetrics] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [isOffline, setIsOffline] = useState(false);
     const [showMedicineManager, setShowMedicineManager] = useState(false);
     
-    const loadData = async () => {
-        if (!managerId) return;
+    const loadingRef = useRef(false);
+    
+    const loadData = useCallback(async () => {
+        if (!managerId || loadingRef.current) return;
+        loadingRef.current = true;
         try {
-            const data = await getCaregiverDashboard(managerId);
+            const data = await apiService.alert.getDashboard(managerId);
             setMetrics(data);
             setIsOffline(data?.isOffline || false);
         } catch (e) {
             console.error("Failed to load dashboard data");
             setIsOffline(true);
+        } finally {
+            loadingRef.current = false;
         }
-    };
+    }, [managerId]);
 
     useEffect(() => {
         loadData();
-        // Polling every 5 seconds for real-time vibe
-        const interval = setInterval(() => loadData(), 5000);
+        // Polling every 10 seconds (increased from 5s to be more conservative)
+        const interval = setInterval(loadData, 10000);
         return () => clearInterval(interval);
-    }, [managerId]);
+    }, [loadData]);
 
     const onRefresh = async () => {
         setRefreshing(true);
         await loadData();
         setRefreshing(false);
     };
+
+    const handleDeleteMedicine = (mid, name) => {
+        Alert.alert(
+            "Delete Medicine",
+            `Are you sure you want to remove ${name}?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Delete", 
+                    style: "destructive", 
+                    onPress: async () => {
+                        try {
+                            await apiService.medicine.delete(mid);
+                            loadData();
+                        } catch (e) {
+                            Alert.alert("Error", "Could not delete medicine.");
+                        }
+                    } 
+                }
+            ]
+        );
+    };
+
+    const handleDeleteAlert = (aid) => {
+        Alert.alert(
+            "Clear Alert",
+            "Do you want to dismiss this alert?",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Dismiss", 
+                    onPress: async () => {
+                        try {
+                            await apiService.alert.delete(aid);
+                            loadData();
+                        } catch (e) {
+                            Alert.alert("Error", "Could not dismiss alert.");
+                        }
+                    } 
+                }
+            ]
+        );
+    };
+
 
     if (showMedicineManager) {
         // Full screen component for adding medicine
@@ -64,13 +113,22 @@ export default function Dashboard({ managerId, onGoToElder }) {
             >
                 {/* Header Section */}
                 <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Sahyogi Dashboard</Text>
-                    {isOffline && (
-                        <TouchableOpacity style={styles.offlineBadge} onPress={loadData}>
-                            <Text style={styles.offlineText}>OFFLINE - TAP TO RETRY</Text>
+                    <View>
+                        <Text style={styles.headerTitle}>Sahyogi</Text>
+                        <Text style={styles.headerSubtitle}>Caregiver Dashboard</Text>
+                    </View>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+                            <Text style={styles.logoutText}>Logout</Text>
                         </TouchableOpacity>
-                    )}
+                        {isOffline && (
+                            <TouchableOpacity style={styles.offlineBadge} onPress={loadData}>
+                                <Text style={styles.offlineText}>OFFLINE</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
                 </View>
+
 
                 {/* Section 1: Live Feed */}
                 <View style={styles.section}>
@@ -107,12 +165,30 @@ export default function Dashboard({ managerId, onGoToElder }) {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Upcoming Medicines</Text>
                     {metrics?.medicines?.length > 0 ? (
-                        metrics.medicines.map((med, index) => (
-                            <View key={index} style={styles.alertItem}>
-                                <Text style={[styles.alertTypeText, { color: '#3498DB' }]}>{med.name} ({med.dosage})</Text>
-                                <Text style={styles.alertTimeText}>{med.time} - Status: {med.status.toUpperCase()}</Text>
-                            </View>
-                        ))
+                        metrics.medicines.map((med, index) => {
+                            const isTaken = med.status === 'taken';
+                            const isMissed = med.status === 'missed';
+                            const accentColor = isTaken ? '#2ECC71' : (isMissed ? '#E74C3C' : '#3498DB');
+                            
+                            return (
+                                <View key={index} style={[styles.alertItem, { borderLeftColor: accentColor }]}>
+                                    <View style={styles.itemContent}>
+                                        <Text style={[styles.alertTypeText, { color: accentColor }]}>
+                                            {med.name} ({med.dosage})
+                                        </Text>
+                                        <Text style={styles.alertTimeText}>
+                                            {med.time} - Status: <Text style={{ fontWeight: 'bold' }}>{med.status.toUpperCase()}</Text>
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity 
+                                        style={styles.deleteBtn} 
+                                        onPress={() => handleDeleteMedicine(med.mid, med.name)}
+                                    >
+                                        <Text style={styles.deleteBtnText}>✕</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            );
+                        })
                     ) : (
                         <View style={styles.noAlertsItem}>
                             <Text style={[styles.noAlertsText, { color: '#7F8C8D' }]}>No medicines scheduled.</Text>
@@ -120,14 +196,23 @@ export default function Dashboard({ managerId, onGoToElder }) {
                     )}
                 </View>
 
+
                 {/* Section 3: Alerts */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Recent Alerts</Text>
                     {metrics?.recent_alerts?.length > 0 ? (
                         metrics.recent_alerts.map((alert, index) => (
                             <View key={index} style={styles.alertItem}>
-                                <Text style={styles.alertTypeText}>{alert.type || alert.event_type}</Text>
-                                <Text style={styles.alertTimeText}>{new Date(alert.timestamp * 1000).toLocaleTimeString()}</Text>
+                                <View style={styles.itemContent}>
+                                    <Text style={styles.alertTypeText}>{alert.type || alert.event_type}</Text>
+                                    <Text style={styles.alertTimeText}>{new Date(alert.timestamp * 1000).toLocaleTimeString()}</Text>
+                                </View>
+                                <TouchableOpacity 
+                                    style={styles.deleteBtn} 
+                                    onPress={() => handleDeleteAlert(alert.aid || alert.id)}
+                                >
+                                    <Text style={styles.deleteBtnText}>✕</Text>
+                                </TouchableOpacity>
                             </View>
                         ))
                     ) : (
@@ -136,6 +221,7 @@ export default function Dashboard({ managerId, onGoToElder }) {
                         </View>
                     )}
                 </View>
+
 
                 {/* Section 4: Quick Actions */}
                 <View style={styles.section}>
@@ -162,9 +248,13 @@ const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#F5F7FA' },
     container: { flex: 1, paddingHorizontal: 20 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 25 },
-    headerTitle: { fontSize: 26, fontWeight: 'bold', color: '#2C3E50' },
-    offlineBadge: { backgroundColor: '#E74C3C', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
-    offlineText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+    headerTitle: { fontSize: 28, fontWeight: 'bold', color: '#2C3E50' },
+    headerSubtitle: { fontSize: 14, color: '#7F8C8D', marginTop: -4 },
+    headerActions: { alignItems: 'flex-end' },
+    logoutBtn: { backgroundColor: '#F8D7DA', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#F5C6CB' },
+    logoutText: { color: '#721C24', fontWeight: 'bold', fontSize: 13 },
+    offlineBadge: { backgroundColor: '#E74C3C', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, marginTop: 5 },
+    offlineText: { color: '#FFF', fontSize: 10, fontWeight: 'bold' },
     section: { marginBottom: 25 },
     sectionTitle: { fontSize: 20, fontWeight: '700', color: '#34495E', marginBottom: 12 },
     cameraPlaceholder: { height: 180, backgroundColor: '#2C3E50', borderRadius: 16, justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10 },
@@ -175,9 +265,12 @@ const styles = StyleSheet.create({
     cardEmoji: { fontSize: 28, marginBottom: 8 },
     cardValue: { fontSize: 18, fontWeight: 'bold', color: '#2C3E50' },
     cardLabel: { fontSize: 12, color: '#7F8C8D', marginTop: 4 },
-    alertItem: { backgroundColor: '#FFF', borderLeftWidth: 5, borderLeftColor: '#E74C3C', padding: 15, borderRadius: 10, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+    alertItem: { backgroundColor: '#FFF', borderLeftWidth: 5, borderLeftColor: '#E74C3C', padding: 15, borderRadius: 10, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    itemContent: { flex: 1 },
     alertTypeText: { fontWeight: 'bold', fontSize: 16, color: '#E74C3C' },
     alertTimeText: { fontSize: 12, color: '#95A5A6', marginTop: 4 },
+    deleteBtn: { padding: 10, marginLeft: 10 },
+    deleteBtnText: { fontSize: 18, color: '#BDC3C7', fontWeight: 'bold' },
     noAlertsItem: { backgroundColor: '#FFF', padding: 15, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: '#E9ECEF' },
     noAlertsText: { color: '#27AE60', fontSize: 14, fontWeight: '500' },
     actionsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
@@ -188,3 +281,4 @@ const styles = StyleSheet.create({
     testElderBtn: { backgroundColor: '#9B59B6', paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
     testElderBtnText: { color: '#FFF', fontWeight: 'bold' }
 });
+
