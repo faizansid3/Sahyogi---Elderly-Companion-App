@@ -241,10 +241,13 @@ def register_caregiver(payload: RegisterPayload):
         print(f"Creating user: {uid}")
         db.collection("users").document(uid).set(user_data)
         return {"status": "success", "user": user_data}
+    except HTTPException as he:
+        # Re-raise deliberate HTTP errors (like "Email already registered")
+        raise he
     except Exception as e:
         print("CRITICAL ERROR IN REGISTER:")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 @router.post("/auth/login")
 def login_caregiver(payload: LoginPayload):
